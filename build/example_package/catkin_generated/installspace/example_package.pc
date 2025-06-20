@@ -1,0 +1,8 @@
+prefix=/home/karim/testproject/install
+
+Name: example_package
+Description: Description of example_package
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: cv_bridge geometry_msgs message_filters nav_msgs roscpp rospy sensor_msgs std_msgs tf

@@ -1,0 +1,2 @@
+example_package:my_cool_project
+-DCATKIN_DEVEL_PREFIX=/home/karim/testproject/devel -DCMAKE_INSTALL_PREFIX=/home/karim/testproject/install -G Unix Makefiles

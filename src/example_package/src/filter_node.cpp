@@ -18,7 +18,7 @@ public:
         : kf_(0.05)   // dt = 0.05 (anpassen wie in deinem Konstruktor)
     {
         // --- Startpose via Parameter oder fest im Code ---
-        double start_x, start_y, start_yaw;
+        double start_x = 0.5, start_y = 0.5, start_yaw = 0.0;
         //nh.param("start_x", start_x, 0.5);
         //nh.param("start_y", start_y, 0.5);
         //nh.param("start_yaw", start_yaw, 0.0);

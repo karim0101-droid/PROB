@@ -44,25 +44,30 @@ void KalmanFilter::predict(const Eigen::VectorXd &u)
 {
     if (!initialized_) return;
 
-    double theta = mu_(2);
+    double theta = mu_(2); 
+
+    A_.setIdentity();
+    A_(0, 3) = delta_t_;
+    A_(1, 4) = delta_t_;
+    A_(2, 5) = delta_t_;
+
+    // Vorhersage der neuen Position basierend auf v_x, v_y, omega
+    mu_ = A_ * mu_;
+
+    // Steuerungsmatrix B (3×2): nur für v_x, v_y, omega
     B_.setZero();
-    B_(3, 0) = std::cos(theta);
-    B_(4, 0) = std::sin(theta);
-    B_(5, 1) = 1.0;
+    B_(0, 0) = std::cos(theta);  // v_x = v * cos(theta)
+    B_(1, 0) = std::sin(theta);  // v_y = v * sin(theta)
+    B_(2, 1) = 1.0;              // omega = omega
 
-    //if (u.size() == 2)
-    mu_ = A_ * mu_ + B_ * u;
-    //mu_ = B_ * u;
-    //else
-    //    mu_ = A_ * mu_;
+    // Berechne neue Geschwindigkeiten
+    Eigen::Vector3d vel = B_ * u;  // vel = [v_x, v_y, omega]
 
-    std::cout << "state of kf:\n" << mu_ << std::endl;
-    std::cout << "A:\n" << A_ << std::endl;
-    std::cout << "A*mu:\n" << A_*mu_ << std::endl;
-    std::cout << "B:\n" << B_ << std::endl;
-    std::cout << "B*u:\n" << B_*u << std::endl;
+    // In den Zustand geben (nicht addieren!)
+    mu_.segment<3>(3) = vel;
+
+    // Kovarianzmatrix vorhersagen
     Sigma_ = A_ * Sigma_ * A_.transpose() + Q_;
-    //std::cout << "Sigma_ after predict:\n" << Sigma_ << std::endl; // DEBUG
 }
 
 // Hilfsfunktion zur Umwandlung Roboter->Welt

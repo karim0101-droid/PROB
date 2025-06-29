@@ -39,12 +39,12 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> KalmanFilter::algorithm(
     B.setZero();
     //B(3, 0) = std::cos(z(2));  // Vorher z(2)
     //B(4, 0) = std::sin(z(2));
-    //B(3, 0) = std::cos(mu_1(2));  // Verwende den aktuellen Zustand!
-    //B(4, 0) = std::sin(mu_1(2));  // Verwende den aktuellen Zustand!
+    B(3, 0) = std::cos(mu_1(2));  // Verwende den aktuellen Zustand!
+    B(4, 0) = std::sin(mu_1(2));  // Verwende den aktuellen Zustand!
 
 
-    B(3, 0) = 0.8;
-    B(4, 0) = 0.2;
+    //B(3, 0) = 0.8;
+    //B(4, 0) = 0.2;
     B(5, 1) = 1.0;
 
 

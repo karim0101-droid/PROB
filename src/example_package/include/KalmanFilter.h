@@ -1,48 +1,37 @@
 #pragma once
 #include <eigen3/Eigen/Dense>
+#include <utility>
 
 class KalmanFilter
 {
 public:
-    KalmanFilter(double delta_t = 0.05);
+    KalmanFilter();
 
-    void initialize(const Eigen::VectorXd &mu0, const Eigen::MatrixXd &Sigma0);
+    // Gibt Zustand und Kovarianz als std::pair zurück
+    std::pair<Eigen::VectorXd, Eigen::MatrixXd> algorithm(
+        const Eigen::VectorXd &mu_1,
+        const Eigen::MatrixXd &P_1,
+        const Eigen::VectorXd &u,
+        const Eigen::VectorXd &z,
+        double dt
+    );
 
-    // Für externe Anpassung (optional)
-    void setProcessNoise(const Eigen::MatrixXd &Q);
-    void setMeasurementNoise(const Eigen::MatrixXd &R);
-
-    // Optional für spezielle Fälle
-    void setControlMatrix(const Eigen::MatrixXd &B);
-
-    // Vorhersage
-    void predict(const Eigen::VectorXd &u = Eigen::VectorXd());
-
-    // Korrektur (Messung!)
-    void updateMeasurement(const Eigen::VectorXd &z_raw, bool velocity_is_robot_frame = true);
-
-    // Getter
     Eigen::VectorXd getState() const;
     Eigen::MatrixXd getCovariance() const;
 
-    double getDt() const { return delta_t_; }
+    void setProcessNoise(const Eigen::MatrixXd& Q_in);
+    void setMeasurementNoise(const Eigen::MatrixXd& R_in);
 
 private:
-    int n_; // Zustandsdimension
-    int m_; // Messdimension
-    double delta_t_;
+    static constexpr int N = 6;
 
-    Eigen::VectorXd mu_;      // Schätzwert (Zustand)
-    Eigen::MatrixXd Sigma_;   // Kovarianz
+    Eigen::MatrixXd A; // Systemmatrix (6x6)
+    Eigen::MatrixXd B; // Steuermatrix (6x2)
+    Eigen::MatrixXd H; // Messmatrix (6x6)
+    Eigen::MatrixXd Q; // Prozessrauschen (6x6)
+    Eigen::MatrixXd R; // Messrauschen (6x6)
+    Eigen::MatrixXd I; // Einheitsmatrix (6x6)
 
-    Eigen::MatrixXd A_;       // Systemmatrix
-    Eigen::MatrixXd B_;       // Steuermatrix
-    Eigen::MatrixXd C_;       // Messmatrix
-    Eigen::MatrixXd Q_;       // Prozessrauschen
-    Eigen::MatrixXd R_;       // Messrauschen
-
-    bool initialized_ = false;
-
-    // Hilfsfunktion: Geschwindigkeit transformieren
-    Eigen::Vector2d velocityRobotToWorld(double v_robot, double theta) const;
+    Eigen::VectorXd mu; // Zustand (6x1)
+    Eigen::MatrixXd P;  // Kovarianzmatrix (6x6)
 };

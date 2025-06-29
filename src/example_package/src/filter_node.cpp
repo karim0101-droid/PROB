@@ -20,9 +20,10 @@ public:
         // states(2)...states(5) sind 0
 
         input = Eigen::VectorXd::Zero(2);
-        measured = Eigen::VectorXd::Zero(6);
-        measured(0) = 0.5;
-        measured(1) = 0.5;
+        //measured = Eigen::VectorXd::Zero(6);
+        //measured(0) = 0.5;
+        //measured(1) = 0.5;
+        //measured = Eigen::VectorXd::Zero(2);
 
         vel_robot = {0.0, 0.0, 0.0};
 
@@ -87,23 +88,30 @@ private:
         //vel_robot.y = imu_msg->linear_acceleration.y * dt;
         vel_robot.y = 0.0;
         vel_robot.phi = imu_msg->angular_velocity.z;
+        if (vel_robot.x >= 0.001)
+        {
+            vel_robot.x = 0.0;
+        }
+        //if vel_robot
         
 
         
         tf2::Quaternion q;
         tf2::fromMsg(imu_msg->orientation, q);
         double roll, pitch, yaw;
+        tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);  
 
+
+        measured = Eigen::VectorXd::Zero(2);
         // In Weltkoordinaten umrechnen (aus Roboter-KS)
-        measured(3) = vel_robot.x * std::cos(yaw); //- vel_robot.y * std::sin(yaw);
-        measured(4) = vel_robot.x * std::sin(yaw); // + vel_robot.y * std::cos(yaw);
-        measured(5) = vel_robot.phi;
+        //measured(3) = vel_robot.x * std::cos(yaw); //- vel_robot.y * std::sin(yaw);
+        //measured(4) = vel_robot.x * std::sin(yaw); // + vel_robot.y * std::cos(yaw);
+        measured(1) = vel_robot.phi;
 
-        
         // Positionsintegration (numerisch)
-        measured(0) = measured(3) * dt;
-        measured(1) = measured(4) * dt;
-        measured(2) = yaw;
+        //measured(0) += measured(3) * dt;
+        //measured(1) += measured(4) * dt;
+        measured(0) = yaw;
 
         //---- KalmanFilter-Schritt (std::pair) ----
         auto [filtered_state, filtered_cov] = kf.algorithm(states, kf.getCovariance(), input, measured, dt);

@@ -6,11 +6,16 @@ KalmanFilter::KalmanFilter()
 {
     A = Eigen::MatrixXd::Identity(N, N);
     B = Eigen::MatrixXd::Zero(N, 2);
-    H = Eigen::MatrixXd::Identity(N, N);
-    H(0, 0) = 0.0;
-    H(1, 1) = 0.0;
-    Q = Eigen::MatrixXd::Identity(N, N) * 0.001;
-    R = Eigen::MatrixXd::Identity(N, N) * 0.006;
+    //H = Eigen::MatrixXd::Identity(N, N);
+    H = Eigen::MatrixXd::Zero(2, N);
+    H(0, 2) = 1.0; // θ
+    H(1, 5) = 1.0; // ω
+    
+    Q = Eigen::MatrixXd::Identity(N, N) * 0.003;
+    R = Eigen::Matrix2d::Identity() * 0.002;
+    I = Eigen::MatrixXd::Identity(N, N);
+
+
     I = Eigen::MatrixXd::Identity(N, N);
 
     mu = Eigen::VectorXd::Zero(N);
@@ -28,13 +33,20 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> KalmanFilter::algorithm(
     //dt = dt*1000.0;
     A.setIdentity();
     A(0, 3) = dt;
-    A(1, 4) = dt;
+    A(1, 4) = dt;   
     A(2, 5) = dt;
 
     B.setZero();
-    B(3, 0) = std::cos(z(2));  // v_x = v * cos(theta)
-    B(4, 0) = std::sin(z(2));  // v_y = v * sin(theta)
+    //B(3, 0) = std::cos(z(2));  // Vorher z(2)
+    //B(4, 0) = std::sin(z(2));
+    //B(3, 0) = std::cos(mu_1(2));  // Verwende den aktuellen Zustand!
+    //B(4, 0) = std::sin(mu_1(2));  // Verwende den aktuellen Zustand!
+
+
+    B(3, 0) = 0.8;
+    B(4, 0) = 0.2;
     B(5, 1) = 1.0;
+
 
     Eigen::VectorXd mu_11 = A * mu_1;
     Eigen::VectorXd vel_11 = B * u;;
@@ -57,6 +69,8 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> KalmanFilter::algorithm(
 
     mu = mu_pred + K * y;
     P  = (I - K * H) * P_pred;
+    std::cout << "Diag(P): " << P.diagonal().transpose() << std::endl;
+
     //P = P_pred;
     //std::cout <<"Updated States: " << mu << std::endl;
     //std::cout <<"time sequence dt: " << dt << std::endl;

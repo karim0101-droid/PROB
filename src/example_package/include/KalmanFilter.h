@@ -5,33 +5,27 @@
 class KalmanFilter
 {
 public:
+    static constexpr int N = 6;               // [x y θ vx vy ω]^T
     KalmanFilter();
 
-    // Gibt Zustand und Kovarianz als std::pair zurück
-    std::pair<Eigen::VectorXd, Eigen::MatrixXd> algorithm(
-        const Eigen::VectorXd &mu_1,
-        const Eigen::MatrixXd &P_1,
-        const Eigen::VectorXd &u,
-        const Eigen::VectorXd &z,
-        double dt
-    );
+    std::pair<Eigen::VectorXd,Eigen::MatrixXd>
+    step(const Eigen::VectorXd&  x_prev,
+         const Eigen::MatrixXd&  P_prev,
+         const Eigen::VectorXd&  u,
+         const Eigen::VectorXd&  z,
+         double dt);
 
-    Eigen::VectorXd getState() const;
-    Eigen::MatrixXd getCovariance() const;
+    const Eigen::VectorXd& state() const { return x_; }
+    const Eigen::MatrixXd& cov()   const { return P_; }
 
-    void setProcessNoise(const Eigen::MatrixXd& Q_in);
-    void setMeasurementNoise(const Eigen::MatrixXd& R_in);
+    void setProcessNoiseStd(double sa,double salpha);
+    void setMeasurementNoise(const Eigen::Matrix<double,6,6>& R_in);
 
 private:
-    static constexpr int N = 6;
+    Eigen::MatrixXd Qscaled(double dt) const;
 
-    Eigen::MatrixXd A; // Systemmatrix (6x6)
-    Eigen::MatrixXd B; // Steuermatrix (6x2)
-    Eigen::MatrixXd H; // Messmatrix (6x6)
-    Eigen::MatrixXd Q; // Prozessrauschen (6x6)
-    Eigen::MatrixXd R; // Messrauschen (6x6)
-    Eigen::MatrixXd I; // Einheitsmatrix (6x6)
-
-    Eigen::VectorXd mu; // Zustand (6x1)
-    Eigen::MatrixXd P;  // Kovarianzmatrix (6x6)
+    Eigen::MatrixXd A_,B_,H_,I_,R_;
+    double sigma_a2_,sigma_alpha2_;
+    Eigen::VectorXd x_;
+    Eigen::MatrixXd P_;
 };

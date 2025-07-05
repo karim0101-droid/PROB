@@ -1,85 +1,98 @@
 #include "KalmanFilter.h"
 #include <cmath>
-#include <iostream>
 
+/* ---------- Konstruktor ---------------------------------------- */
 KalmanFilter::KalmanFilter()
+    : A_(Eigen::MatrixXd::Identity(N, N)),
+      B_(Eigen::MatrixXd::Zero(N, 2)),
+      H_(Eigen::Matrix<double, 6, N>::Identity()), // 6×6 Einheits-H
+      I_(Eigen::MatrixXd::Identity(N, N)),
+      R_(Eigen::Matrix<double, 6, 6>::Zero()),
+      sigma_a2_(0.08 * 0.08),     // 0.08 m/s²
+      sigma_alpha2_(0.04 * 0.04), // 0.04 rad/s²
+      x_(Eigen::VectorXd::Zero(N)),
+      P_(Eigen::MatrixXd::Identity(N, N) * 1e-3)
 {
-    A = Eigen::MatrixXd::Identity(N, N);
-    B = Eigen::MatrixXd::Zero(N, 2);
-    //H = Eigen::MatrixXd::Identity(N, N);
-    H = Eigen::MatrixXd::Zero(2, N);
-    H(0, 2) = 1.0; // θ
-    H(1, 5) = 1.0; // ω
-    
-    Q = Eigen::MatrixXd::Identity(N, N) * 0.003;
-    R = Eigen::Matrix2d::Identity() * 0.002;
-    I = Eigen::MatrixXd::Identity(N, N);
-
-
-    I = Eigen::MatrixXd::Identity(N, N);
-
-    mu = Eigen::VectorXd::Zero(N);
-    P = Eigen::MatrixXd::Identity(N, N);
+    /* --- R: große Varianzen für Pseudo-Messungen -------------- */
+    R_.diagonal() << 0.04 * 0.04, 0.04 * 0.04, // x, y   (4 cm 1 σ)
+        0.03 * 0.03,                           // θ
+        0.03 * 0.03, 0.03 * 0.03,              // v_x, v_y
+        0.012 * 0.012;                         // ω
 }
 
-std::pair<Eigen::VectorXd, Eigen::MatrixXd> KalmanFilter::algorithm(
-    const Eigen::VectorXd &mu_1,
-    const Eigen::MatrixXd &P_1,
-    const Eigen::VectorXd &u,
-    const Eigen::VectorXd &z,
-    double dt)
+/* ---------- σ_Q anpassen --------------------------------------- */
+void KalmanFilter::setProcessNoiseStd(double sa, double salpha)
 {
-    // Prediction Schritt q      
-    //dt = dt*1000.0;
-    A.setIdentity();
-    A(0, 3) = dt;
-    A(1, 4) = dt;   
-    A(2, 5) = dt;
-
-    B.setZero();
-    //B(3, 0) = std::cos(z(2));  // Vorher z(2)
-    //B(4, 0) = std::sin(z(2));
-    B(3, 0) = std::cos(mu_1(2));  // Verwende den aktuellen Zustand!
-    B(4, 0) = std::sin(mu_1(2));  // Verwende den aktuellen Zustand!
-
-
-    //B(3, 0) = 0.8;
-    //B(4, 0) = 0.2;
-    B(5, 1) = 1.0;
-
-
-    Eigen::VectorXd mu_11 = A * mu_1;
-    Eigen::VectorXd vel_11 = B * u;;
-    Eigen::VectorXd mu_pred = A * mu_1;
-    Eigen::MatrixXd P_pred  = A * P_1 * A.transpose() + Q;
-    //Eigen::MatrixXd P_pred = Eigen::MatrixXd::Identity(N, N);
-
-    //mu_pred.segment<3>(3) = vel_11;
-    mu_pred(3) = vel_11(3);
-    mu_pred(4) = vel_11(4);
-    mu_pred(5) = vel_11(5);
-
-
-    //std::cout <<"Predicted States: " << vel_11(3) << std::endl;
-
-    // Update Schritt
-    Eigen::VectorXd y = z - H * mu_pred;
-    Eigen::MatrixXd S = H * P_pred * H.transpose() + R;
-    Eigen::MatrixXd K = P_pred * H.transpose() * S.inverse();
-
-    mu = mu_pred + K * y;
-    P  = (I - K * H) * P_pred;
-    std::cout << "Diag(P): " << P.diagonal().transpose() << std::endl;
-
-    //P = P_pred;
-    //std::cout <<"Updated States: " << mu << std::endl;
-    //std::cout <<"time sequence dt: " << dt << std::endl;
-
-    return std::make_pair(mu, P);
+    sigma_a2_ = sa * sa;
+    sigma_alpha2_ = salpha * salpha;
 }
 
-Eigen::VectorXd KalmanFilter::getState() const { return mu; }
-Eigen::MatrixXd KalmanFilter::getCovariance() const { return P; }
+void KalmanFilter::setMeasurementNoise(const Eigen::Matrix<double, 6, 6> &R_in)
+{
+    R_ = R_in;
+}
 
-void KalmanFilter::setProcessNoise(const Eigen::MatrixXd& Q_in) { Q = Q_in; }
-void KalmanFilter::setMeasurementNoise(const Eigen::MatrixXd& R_in) { R = R_in; }
+/* =====================  STEP  ================================== */
+std::pair<Eigen::VectorXd, Eigen::MatrixXd>
+KalmanFilter::step(const Eigen::VectorXd &x_prev,
+                   const Eigen::MatrixXd &P_prev,
+                   const Eigen::VectorXd &u,
+                   const Eigen::VectorXd &z,
+                   double dt)
+{
+    dt = std::clamp(dt, 1e-4, 0.05);
+
+    /* ---------- A & B ------------------------------------------ */
+    A_.setIdentity();
+    A_(0, 3) = A_(1, 4) = A_(2, 5) = dt;
+
+    double th = x_prev(2);
+    double c = std::cos(th), s = std::sin(th);
+
+    B_.setZero();
+    B_(3, 0) = c; // vx = v_body·cosθ_{k-1}
+    B_(4, 0) = s; // vy = v_body·sinθ_{k-1}
+    // B_(2,1)=dt;          // θ  += ω_cmd·dt
+    B_(5, 1) = 1.0; // ω  =  ω_cmd
+
+    /* ---------- Prädiktion ------------------------------------- */
+    Eigen::VectorXd x_pred_1 = B_ * u;
+    Eigen::VectorXd x_pred = A_ * x_prev; // **nur 1×**
+    x_pred(3) = x_pred_1(3);
+    x_pred(4) = x_pred_1(4);
+    x_pred(5) = x_pred_1(5);
+    Eigen::MatrixXd P_pred = A_ * P_prev * A_.transpose() + Qscaled(dt);
+
+    /* ---------- Update (6-D) ----------------------------------- */
+    /* --- Innovation / Update (6-D) -------------------------------- */
+    /* --- Innovation / Update (6-D) -------------------------------- */
+    Eigen::Matrix<double, 6, 1> y = z - x_pred; // H = I
+    y(2) = std::atan2(std::sin(y(2)), std::cos(y(2)));
+
+    Eigen::Matrix<double, 6, 6> S = P_pred + R_;
+    Eigen::Matrix<double, N, 6> K = P_pred * S.inverse();
+
+    x_ = x_pred + K * y;
+    P_ = (I_ - K) * P_pred; // H = I
+
+    x_(2) = std::atan2(std::sin(x_(2)), std::cos(x_(2)));
+
+    return {x_, P_};
+}
+
+/* ---------- Q(dt) wie gehabt ---------------------------------- */
+Eigen::MatrixXd KalmanFilter::Qscaled(double dt) const
+{
+    double dt2 = dt * dt, dt3 = dt2 * dt, dt4 = dt2 * dt2;
+    Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(N, N);
+
+    Q(0, 0) = Q(1, 1) = 0.25 * dt4 * sigma_a2_;
+    Q(0, 3) = Q(3, 0) = 0.5 * dt3 * sigma_a2_;
+    Q(1, 4) = Q(4, 1) = 0.5 * dt3 * sigma_a2_;
+    Q(3, 3) = Q(4, 4) = dt2 * sigma_a2_;
+
+    Q(2, 2) = 0.25 * dt4 * sigma_alpha2_;
+    Q(2, 5) = Q(5, 2) = 0.5 * dt3 * sigma_alpha2_;
+    Q(5, 5) = dt2 * sigma_alpha2_;
+    return Q;
+}

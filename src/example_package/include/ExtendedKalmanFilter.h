@@ -1,43 +1,42 @@
 #pragma once
-
 #include <eigen3/Eigen/Dense>
-#include <functional>
+#include <utility>
 
 class ExtendedKalmanFilter
 {
 public:
-    ExtendedKalmanFilter(double delta_t);
+    static constexpr int N = 6; // [x y θ vx vy ω]ᵀ
+    ExtendedKalmanFilter();
 
-    void initialize(const Eigen::VectorXd &mu0, const Eigen::MatrixXd &Sigma0);
-    void setProcessNoise(const Eigen::MatrixXd &Q);
-    void setMeasurementNoise(const Eigen::MatrixXd &R);
+    std::pair<Eigen::VectorXd, Eigen::MatrixXd>
+    step(const Eigen::VectorXd &x_prev,
+         const Eigen::MatrixXd &P_prev,
+         const Eigen::VectorXd &u,
+         const Eigen::VectorXd &z,
+         double dt);
 
-    // Set nonlinear functions and their Jacobians
-    void setStateTransitionFunction(
-        std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> g,
-        std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> G_jac);
-    void setMeasurementFunction(
-        std::function<Eigen::VectorXd(const Eigen::VectorXd&)> h,
-        std::function<Eigen::MatrixXd(const Eigen::VectorXd&)> H_jac);
+    /* Getter */
+    const Eigen::VectorXd &state() const { return x_; }
+    const Eigen::MatrixXd &cov() const { return P_; }
 
-    void predict(const Eigen::VectorXd &u);
-    void updateMeasurement(const Eigen::VectorXd &z);
-
-    Eigen::VectorXd getState() const;
-    Eigen::MatrixXd getCovariance() const;
+    /* Tuning */
+    void setProcessNoiseStd(double sa, double salpha);
+    void setMeasurementNoise(const Eigen::Matrix<double, 6, 6> &R_in) { R6_ = R_in; }
 
 private:
-    double delta_t_;
-    int n_;
-    bool initialized_ = false;
+    /* Dynamik + Ableitungen */
+    Eigen::VectorXd g(const Eigen::VectorXd &x,
+                      const Eigen::VectorXd &u,
+                      double dt) const;
+    Eigen::MatrixXd F(const Eigen::VectorXd &x,
+                      const Eigen::VectorXd &u,
+                      double dt) const;
+    Eigen::MatrixXd Qscaled(double dt) const;
 
-    Eigen::VectorXd mu_;
-    Eigen::MatrixXd Sigma_;
-    Eigen::MatrixXd Q_;
-    Eigen::MatrixXd R_;
-
-    std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> g_;
-    std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> G_jac_;
-    std::function<Eigen::VectorXd(const Eigen::VectorXd&)> h_;
-    std::function<Eigen::MatrixXd(const Eigen::VectorXd&)> H_jac_;
+    /* Member ------------------------------------------------------- */
+    Eigen::VectorXd x_;
+    Eigen::MatrixXd P_;
+    Eigen::Matrix<double, 6, 6> R6_; // Messrauschen (6×6)
+    double sigma_a2_, sigma_alpha2_;
+    const Eigen::MatrixXd I_;
 };

@@ -218,6 +218,18 @@ include_directories(
 # catkin_add_nosetests(test)
 
 #--- Filter Node ---#
-add_executable(filter_node src/filter_node.cpp src/KalmanFilter.cpp src/ExtendedKalmanFilter.cpp src/ParticleFilter.cpp)
-add_dependencies(filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(filter_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+##add_executable(filter_node src/filter_node.cpp src/KalmanFilter.cpp src/ExtendedKalmanFilter.cpp src/ParticleFilter.cpp)
+##add_dependencies(filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+##target_link_libraries(filter_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(filter_node_1 src/filter_node_1.cpp)
+add_dependencies(filter_node_1 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(filter_node_1 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(particle_filter_node src/particle_filter_node.cpp)
+add_dependencies(particle_filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(particle_filter_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(pf_node src/pf_node.cpp)
+add_dependencies(pf_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(pf_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})

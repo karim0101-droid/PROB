@@ -9,22 +9,26 @@
 #include <string>
 #include <cmath> // For M_PI
 
+// Structure to hold goal data: position and yaw angle (in degrees)
 struct RobotGoal
 {
     double x;
     double y;
-    double yaw_deg;
+    double yaw_deg; // Yaw angle in degrees
 };
 
+// Class that publishes a sequence of goals to move_base
 class GoalPublisher
 {
 public:
     typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
 
-    GoalPublisher(ros::NodeHandle &nh) : nh_(nh),
-                                         current_goal_idx_(-1),
-                                         ac_("move_base", true) // Create the action client, true = spin a thread
+    GoalPublisher(ros::NodeHandle &nh)
+        : nh_(nh),
+          current_goal_idx_(-1), // No goal published yet
+          ac_("move_base", true) // Create the ActionClient, spin thread internally
     {
+        // Define a sequence of goals (x, y, yaw in degrees)
         goals_.push_back({3.5, 0.5, 90.0});
         goals_.push_back({4.0, 2.5, 180.0});
         goals_.push_back({3.0, 3.5, 255.0});
@@ -32,18 +36,20 @@ public:
 
         ROS_INFO("GoalPublisher node started.");
 
+        // Wait for the move_base action server to be available
         ROS_INFO("Waiting for the move_base action server to start...");
         ac_.waitForServer();
         ROS_INFO("move_base action server started.");
     }
 
+    // Begin publishing the first goal in the sequence
     void startPublishingSequence()
     {
-        // This is called once after initial 10-second delay in main()
         publishNextGoal();
     }
 
 private:
+    // Publishes the next goal in the list, if any remain
     void publishNextGoal()
     {
         if (current_goal_idx_ + 1 < goals_.size())
@@ -55,22 +61,25 @@ private:
             goal.target_pose.header.stamp = ros::Time::now();
             goal.target_pose.header.frame_id = "map";
 
+            // Set goal position
             goal.target_pose.pose.position.x = current_robot_goal.x;
             goal.target_pose.pose.position.y = current_robot_goal.y;
             goal.target_pose.pose.position.z = 0.0;
 
+            // Convert yaw (degrees) to quaternion
             tf2::Quaternion q;
             double yaw_rad = current_robot_goal.yaw_deg * M_PI / 180.0;
             q.setRPY(0, 0, yaw_rad);
             goal.target_pose.pose.orientation = tf2::toMsg(q);
 
-            ROS_INFO("Sending Goal %zu: x=%.2f, y=%.2f, yaw=%.1f deg",
+            ROS_INFO("Sending Goal %zu: x=%.2f, y=%.2f, yaw=%.1f°",
                      current_goal_idx_ + 1, current_robot_goal.x, current_robot_goal.y, current_robot_goal.yaw_deg);
 
+            // Send goal with callbacks
             ac_.sendGoal(goal,
-                         boost::bind(&GoalPublisher::doneCb, this, _1, _2),
-                         boost::bind(&GoalPublisher::activeCb, this),
-                         boost::bind(&GoalPublisher::feedbackCb, this, _1));
+                         boost::bind(&GoalPublisher::doneCb, this, _1, _2),     // Done callback
+                         boost::bind(&GoalPublisher::activeCb, this),           // Active callback
+                         boost::bind(&GoalPublisher::feedbackCb, this, _1));    // Feedback callback
 
             ROS_INFO("Waiting for goal %zu to complete...", current_goal_idx_ + 1);
         }
@@ -82,46 +91,50 @@ private:
         }
     }
 
-    // Called once when the goal completes
+    // Called once when the current goal has finished (succeeded, failed, etc.)
     void doneCb(const actionlib::SimpleClientGoalState &state,
                 const move_base_msgs::MoveBaseResultConstPtr &result)
     {
-        ROS_INFO("Goal %zu finished with status: %s", current_goal_idx_ + 1, state.toString().c_str());
+        ROS_INFO("Goal %zu finished with status: %s",
+                 current_goal_idx_ + 1, state.toString().c_str());
 
-        // Create a one-shot timer to publish the next goal after a short delay
-        // This allows the current doneCb to return and actionlib to process state changes.
-        next_goal_timer_ = nh_.createTimer(ros::Duration(1.0), // 1 second delay
+        // Schedule the next goal after a short delay using a one-shot timer
+        next_goal_timer_ = nh_.createTimer(ros::Duration(1.0), // 1-second delay
                                            &GoalPublisher::nextGoalTimerCallback,
                                            this,
-                                           true); // true means one-shot timer
+                                           true); // one-shot timer
     }
 
-    // Callback for the one-shot timer
+    // Timer callback to trigger sending the next goal
     void nextGoalTimerCallback(const ros::TimerEvent &event)
     {
-        publishNextGoal(); // Now, publish the next goal
+        publishNextGoal();
     }
 
-    // Called once when the goal becomes active
+    // Called once when a goal is actually active
     void activeCb()
     {
         ROS_INFO("Goal %zu just went active.", current_goal_idx_ + 1);
     }
 
-    // Called every time feedback is received for the goal
+    // Called periodically with feedback during goal execution
     void feedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr &feedback)
     {
-        // ROS_INFO_THROTTLE(10, "Received feedback for goal %zu. Current pose: x=%.2f, y=%.2f, yaw_rad=%.2f",
-        //          current_goal_idx_ + 1, feedback->base_position.pose.position.x,
-        //          feedback->base_position.pose.position.y,
-        //          tf2::getYaw(feedback->base_position.pose.orientation));
+        // Uncomment to print live feedback from move_base
+        /*
+        ROS_INFO_THROTTLE(10, "Received feedback for goal %zu. Current pose: x=%.2f, y=%.2f, yaw=%.2f rad",
+                 current_goal_idx_ + 1,
+                 feedback->base_position.pose.position.x,
+                 feedback->base_position.pose.position.y,
+                 tf2::getYaw(feedback->base_position.pose.orientation));
+        */
     }
 
-    ros::NodeHandle nh_;
-    MoveBaseClient ac_;
-    std::vector<RobotGoal> goals_;
-    ssize_t current_goal_idx_;
-    ros::Timer next_goal_timer_; // New: Timer for scheduling next goal
+    ros::NodeHandle nh_;                 // ROS node handle
+    MoveBaseClient ac_;                  // Action client for move_base
+    std::vector<RobotGoal> goals_;       // List of goals to send
+    ssize_t current_goal_idx_;           // Index of current goal in list
+    ros::Timer next_goal_timer_;         // Timer to delay sending next goal
 };
 
 int main(int argc, char **argv)
@@ -131,14 +144,13 @@ int main(int argc, char **argv)
 
     GoalPublisher publisher(nh);
 
-    // Initial wait for 10 seconds before publishing the first goal
+    // Wait a few seconds before sending the first goal (for startup)
     ROS_INFO("Waiting 10 seconds before publishing the first goal...");
     ros::Duration(10.0).sleep();
 
-    // Start publishing the goals
     publisher.startPublishingSequence();
 
-    ros::spin();
+    ros::spin(); // Keep the node alive and handling callbacks
 
     return 0;
 }

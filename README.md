@@ -1,32 +1,32 @@
-#🧭 Filter Evaluation in TurtleBot3 Maze
+# 🧭 Filter Evaluation in TurtleBot3 Maze
 Package: example_package
 Workspace: testproject
 
 This project implements and evaluates three state estimation filters for a mobile robot navigating a maze-like environment in Gazebo. Each filter estimates the robot's pose and velocity based on odometry and sensor data:
 
-##📚 Filter Overview
-###🔹 Linear Kalman Filter (KF)
+## 📚 Filter Overview
+### 🔹 Linear Kalman Filter (KF)
 Model: Assumes linear system dynamics and Gaussian noise.
 
 Strengths: Simple, fast, and effective for systems that are approximately linear.
 
 Limitations: Inaccurate when facing nonlinear motion or non-Gaussian noise.
 
-###🔸 Extended Kalman Filter (EKF)
+### 🔸 Extended Kalman Filter (EKF)
 Model: Handles nonlinear dynamics by linearizing around the current estimate.
 
 Strengths: Suitable for real-world robots with nonlinear motion and sensors.
 
 Limitations: Accuracy depends on how close the system behaves linearly around the current estimate.
 
-###🟢 Particle Filter (PF)
+### 🟢 Particle Filter (PF)
 Model: Represents the belief state using a set of weighted samples (particles).
 
 Strengths: Works with non-Gaussian, highly nonlinear systems. Robust to ambiguous observations.
 
 Limitations: Computationally expensive, especially with many particles.
 
-###🚀 Launch the Simulation
+### 🚀 Launch the Simulation
 ```
 cd ~/testproject
 catkin_make
@@ -41,7 +41,7 @@ This will:
 ✅ Open RViz layout (from my_cool_project/config/)
 
 
-####📈 Run: Bag + Plot
+#### 📈 Run: Bag + Plot
 After launching the simulation, run:
 ```
 bash
@@ -58,7 +58,7 @@ Output goes to:
 📁 example_package/plots/
 
 
-#####📊 Plots Generated
+##### 📊 Plots Generated
 Each filter is compared to /odom ground-truth:
 
 📍 Trajectory (x-y) + RMSE
